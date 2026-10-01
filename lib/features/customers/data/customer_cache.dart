@@ -36,25 +36,21 @@ class CustomerCache {
 
   Future<List<Customer>> getCachedCustomers() async {
     final prefs = await SharedPreferences.getInstance();
-
     final cachedData = prefs.getString(_customersKey);
 
     if (cachedData == null) {
       return [];
     }
 
-    final decoded = jsonDecode(cachedData);
+    final decoded = _decodeList(cachedData);
 
-    if (decoded is! List) {
+    if (decoded == null) {
       return [];
     }
 
     return decoded
-        .whereType<Map>()
         .map(
-          (customer) => Customer.fromMap(
-        Map<String, dynamic>.from(customer),
-      ),
+          (customer) => Customer.fromMap(customer),
     )
         .toList();
   }
@@ -66,21 +62,10 @@ class CustomerCache {
     final prefs = await SharedPreferences.getInstance();
 
     final pendingData = prefs.getString(_pendingUpdatesKey);
-
-    List<dynamic> updates = [];
-
-    if (pendingData != null) {
-      final decoded = jsonDecode(pendingData);
-
-      if (decoded is List) {
-        updates = decoded;
-      }
-    }
+    final updates = _decodeList(pendingData) ?? [];
 
     updates.removeWhere(
-          (update) =>
-      update is Map &&
-          update['customerId'] == customerId,
+          (update) => update['customerId'] == customerId,
     );
 
     updates.add({
@@ -96,51 +81,55 @@ class CustomerCache {
 
   Future<List<Map<String, dynamic>>> getPendingPhoneUpdates() async {
     final prefs = await SharedPreferences.getInstance();
-
     final pendingData = prefs.getString(_pendingUpdatesKey);
 
-    if (pendingData == null) {
-      return [];
-    }
-
-    final decoded = jsonDecode(pendingData);
-
-    if (decoded is! List) {
-      return [];
-    }
-
-    return decoded
-        .whereType<Map>()
-        .map(
-          (update) => Map<String, dynamic>.from(update),
-    )
-        .toList();
+    return _decodeList(pendingData) ?? [];
   }
 
   Future<void> clearPendingPhoneUpdate(int customerId) async {
     final prefs = await SharedPreferences.getInstance();
-
     final pendingData = prefs.getString(_pendingUpdatesKey);
 
     if (pendingData == null) {
       return;
     }
 
-    final decoded = jsonDecode(pendingData);
+    final updates = _decodeList(pendingData);
 
-    if (decoded is! List) {
+    if (updates == null) {
       return;
     }
 
-    decoded.removeWhere(
-          (update) =>
-      update is Map &&
-          update['customerId'] == customerId,
+    updates.removeWhere(
+          (update) => update['customerId'] == customerId,
     );
 
     await prefs.setString(
       _pendingUpdatesKey,
-      jsonEncode(decoded),
+      jsonEncode(updates),
     );
+  }
+
+  List<Map<String, dynamic>>? _decodeList(String? data) {
+    if (data == null) {
+      return null;
+    }
+
+    try {
+      final decoded = jsonDecode(data);
+
+      if (decoded is! List) {
+        return null;
+      }
+
+      return decoded
+          .whereType<Map>()
+          .map(
+            (item) => Map<String, dynamic>.from(item),
+      )
+          .toList();
+    } on FormatException {
+      return null;
+    }
   }
 }

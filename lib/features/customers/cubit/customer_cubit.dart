@@ -3,50 +3,53 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../data/customer_model.dart';
 import '../data/customer_repo.dart';
 
-sealed class CustomerState {}
+sealed class CustomerState {
+  const CustomerState();
+}
 
-class CustomerInitial extends CustomerState {}
+class CustomerInitial extends CustomerState {
+  const CustomerInitial();
+}
 
-class CustomerLoading extends CustomerState {}
+class CustomerLoading extends CustomerState {
+  const CustomerLoading();
+}
 
 class CustomerLoaded extends CustomerState {
-  CustomerLoaded(this.customers);
+  const CustomerLoaded(this.customers);
 
   final List<Customer> customers;
 }
 
 class CustomerDetailsLoaded extends CustomerState {
-  CustomerDetailsLoaded(this.customer);
+  const CustomerDetailsLoaded(this.customer);
 
   final Customer customer;
 }
 
 class CustomerError extends CustomerState {
-  CustomerError(this.message);
+  const CustomerError(this.message);
 
   final String message;
 }
 
 class CustomerCubit extends Cubit<CustomerState> {
   CustomerCubit({
-    required this._repository,
-  }) : super(CustomerInitial());
+    required CustomerRepository repository,
+  })  : _repository = repository,
+        super(const CustomerInitial());
 
   final CustomerRepository _repository;
 
   Future<void> loadCustomers() async {
-    emit(CustomerLoading());
+    emit(const CustomerLoading());
 
     try {
       final customers = await _repository.getCustomers();
 
       emit(CustomerLoaded(customers));
-    } catch (e) {
-      emit(
-        CustomerError(
-          e.toString(),
-        ),
-      );
+    } catch (error) {
+      emit(CustomerError(error.toString()));
     }
   }
 
@@ -57,17 +60,13 @@ class CustomerCubit extends Cubit<CustomerState> {
       );
 
       emit(CustomerLoaded(customers));
-    } catch (e) {
-      emit(
-        CustomerError(
-          e.toString(),
-        ),
-      );
+    } catch (error) {
+      emit(CustomerError(error.toString()));
     }
   }
 
   Future<void> loadCustomerDetails(int customerId) async {
-    emit(CustomerLoading());
+    emit(const CustomerLoading());
 
     try {
       final customer = await _repository.getCustomerDetails(
@@ -75,12 +74,8 @@ class CustomerCubit extends Cubit<CustomerState> {
       );
 
       emit(CustomerDetailsLoaded(customer));
-    } catch (e) {
-      emit(
-        CustomerError(
-          e.toString(),
-        ),
-      );
+    } catch (error) {
+      emit(CustomerError(error.toString()));
     }
   }
 
@@ -99,12 +94,8 @@ class CustomerCubit extends Cubit<CustomerState> {
       );
 
       emit(CustomerDetailsLoaded(customer));
-    } catch (e) {
-      emit(
-        CustomerError(
-          e.toString(),
-        ),
-      );
+    } catch (error) {
+      emit(CustomerError(error.toString()));
     }
   }
 }

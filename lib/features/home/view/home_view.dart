@@ -10,14 +10,15 @@ import '../../sales_order/view/sales_order_list_view.dart';
 
 class HomeView extends StatelessWidget {
   const HomeView({
-    required this.customerRepository,
-    required this.salesOrderRepository,
+    required CustomerRepository customerRepository,
+    required SalesOrderRepository salesOrderRepository,
     required this.isInternalUser,
     super.key,
-  });
+  })  : _customerRepository = customerRepository,
+        _salesOrderRepository = salesOrderRepository;
 
-  final CustomerRepository customerRepository;
-  final SalesOrderRepository salesOrderRepository;
+  final CustomerRepository _customerRepository;
+  final SalesOrderRepository _salesOrderRepository;
   final bool isInternalUser;
 
   @override
@@ -29,56 +30,64 @@ class HomeView extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Card(
-            child: ListTile(
-              leading: const Icon(Icons.people),
-              title: const Text('Customers'),
-              subtitle: const Text('View and manage customers'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => BlocProvider(
-                      create: (_) => CustomerCubit(
-                        repository: customerRepository,
-                      )..loadCustomers(),
-                      child: CustomerListView(
-                        customerRepository: customerRepository,
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
+          _buildCustomersCard(context),
           if (isInternalUser) ...[
             const SizedBox(height: 12),
-            Card(
-              child: ListTile(
-                leading: const Icon(Icons.receipt_long),
-                title: const Text('Sales Orders'),
-                subtitle: const Text('View and manage sales orders'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => BlocProvider(
-                        create: (_) => SalesOrderCubit(
-                          repository: salesOrderRepository,
-                        )..loadSalesOrders(),
-                        child: SalesOrderListView(
-                          salesOrderRepository: salesOrderRepository,
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
+            _buildSalesOrdersCard(context),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildCustomersCard(BuildContext context) {
+    return Card(
+      child: ListTile(
+        leading: const Icon(Icons.people),
+        title: const Text('Customers'),
+        subtitle: const Text('View and manage customers'),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => BlocProvider(
+                create: (_) => CustomerCubit(
+                  repository: _customerRepository,
+                ),
+                child: CustomerListView(
+                  customerRepository: _customerRepository,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildSalesOrdersCard(BuildContext context) {
+    return Card(
+      child: ListTile(
+        leading: const Icon(Icons.receipt_long),
+        title: const Text('Sales Orders'),
+        subtitle: const Text('View and manage sales orders'),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => BlocProvider(
+                create: (_) => SalesOrderCubit(
+                  repository: _salesOrderRepository,
+                )..loadSalesOrders(),
+                child: SalesOrderListView(
+                  salesOrderRepository: _salesOrderRepository,
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }

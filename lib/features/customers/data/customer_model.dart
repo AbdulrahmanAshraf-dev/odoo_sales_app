@@ -25,8 +25,8 @@ class Customer {
 
   factory Customer.fromMap(Map<String, dynamic> map) {
     return Customer(
-      id: map['id'] as int,
-      name: _toString(map['name']),
+      id: _toInt(map['id']),
+      name: _toRequiredString(map['name']),
       phone: _toNullableString(map['phone']),
       email: _toNullableString(map['email']),
       street: _toNullableString(map['street']),
@@ -38,39 +38,51 @@ class Customer {
     );
   }
 
-  static String _toString(dynamic value) {
+  static int _toInt(Object? value) {
+    if (value is int) {
+      return value;
+    }
+
+    if (value is num) {
+      return value.toInt();
+    }
+
+    throw FormatException(
+      'Invalid customer ID: $value',
+    );
+  }
+
+  static String _toRequiredString(Object? value) {
     if (value == null || value == false) {
       return '';
     }
 
-    return value.toString();
+    return value.toString().trim();
   }
 
-  static String? _toNullableString(dynamic value) {
+  static String? _toNullableString(Object? value) {
     if (value == null || value == false) {
       return null;
     }
 
     final stringValue = value.toString().trim();
 
-    if (stringValue.isEmpty) {
+    return stringValue.isEmpty ? null : stringValue;
+  }
+
+  static String? _many2OneName(Object? value) {
+    if (value is! List || value.length < 2) {
       return null;
     }
 
-    return stringValue;
-  }
+    final name = value[1];
 
-  static String? _many2OneName(dynamic value) {
-    if (value is List && value.length > 1) {
-      final name = value[1];
-
-      if (name == null || name == false) {
-        return null;
-      }
-
-      return name.toString();
+    if (name == null || name == false) {
+      return null;
     }
 
-    return null;
+    final stringValue = name.toString().trim();
+
+    return stringValue.isEmpty ? null : stringValue;
   }
 }

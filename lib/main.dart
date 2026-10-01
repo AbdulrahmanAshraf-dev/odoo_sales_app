@@ -7,21 +7,24 @@ import 'features/auth/view/login_view.dart';
 import 'features/customers/data/customer_repo.dart';
 import 'features/sales_order/data/sales_order_repo.dart';
 
+const _odooBaseUrl = 'https://sales-app-demo.odoo.com';
+const _odooDatabase = 'sales-app-demo';
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   final odooClient = OdooClient(
-    baseUrl: 'https://sales-app-demo.odoo.com',
+    baseUrl: _odooBaseUrl,
   );
 
   final customerRepository = CustomerRepository(
     odooClient: odooClient,
-    database: 'sales-app-demo',
+    database: _odooDatabase,
   );
 
   final salesOrderRepository = SalesOrderRepository(
     odooClient: odooClient,
-    database: 'sales-app-demo',
+    database: _odooDatabase,
   );
 
   runApp(

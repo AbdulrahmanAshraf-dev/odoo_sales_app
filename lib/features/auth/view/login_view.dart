@@ -8,19 +8,22 @@ import '../cubit/auth_cubit.dart';
 
 class LoginView extends StatefulWidget {
   const LoginView({
-    required this.customerRepository,
-    required this.salesOrderRepository,
+    required CustomerRepository customerRepository,
+    required SalesOrderRepository salesOrderRepository,
     super.key,
-  });
+  })  : _customerRepository = customerRepository,
+        _salesOrderRepository = salesOrderRepository;
 
-  final CustomerRepository customerRepository;
-  final SalesOrderRepository salesOrderRepository;
+  final CustomerRepository _customerRepository;
+  final SalesOrderRepository _salesOrderRepository;
 
   @override
   State<LoginView> createState() => _LoginViewState();
 }
 
 class _LoginViewState extends State<LoginView> {
+  final _formKey = GlobalKey<FormState>();
+
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
 
@@ -32,9 +35,34 @@ class _LoginViewState extends State<LoginView> {
   }
 
   void _login() {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
     context.read<AuthCubit>().login(
       username: _usernameController.text.trim(),
       password: _passwordController.text,
+    );
+  }
+
+  void _handleAuthSuccess(AuthSuccess state) {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => HomeView(
+          customerRepository: widget._customerRepository,
+          salesOrderRepository: widget._salesOrderRepository,
+          isInternalUser: state.isInternalUser,
+        ),
+      ),
+    );
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+      ),
     );
   }
 
@@ -48,67 +76,87 @@ class _LoginViewState extends State<LoginView> {
         padding: const EdgeInsets.all(16),
         child: BlocConsumer<AuthCubit, AuthState>(
           listener: (context, state) {
-            if (state is AuthSuccess) {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => HomeView(
-                    customerRepository: widget.customerRepository,
-                    salesOrderRepository: widget.salesOrderRepository,
-                    isInternalUser: state.isInternalUser,
-                  ),
-                ),
-              );
+            if (!context.mounted) {
+              return;
             }
 
-            if (state is AuthError) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(state.message),
-                ),
-              );
+            switch (state) {
+              case AuthSuccess():
+                _handleAuthSuccess(state);
+
+              case AuthError():
+                _showError(state.message);
+
+              case AuthInitial():
+              case AuthLoading():
+                break;
             }
           },
           builder: (context, state) {
             final isLoading = state is AuthLoading;
 
-            return Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                TextField(
-                  controller: _usernameController,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(
-                    labelText: 'Username',
-                    border: OutlineInputBorder(),
+            return Form(
+              key: _formKey,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  TextFormField(
+                    controller: _usernameController,
+                    keyboardType: TextInputType.emailAddress,
+                    textInputAction: TextInputAction.next,
+                    autocorrect: false,
+                    decoration: const InputDecoration(
+                      labelText: 'Username',
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Please enter your username';
+                      }
+
+                      return null;
+                    },
                   ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _passwordController,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Password',
-                    border: OutlineInputBorder(),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _passwordController,
+                    obscureText: true,
+                    textInputAction: TextInputAction.done,
+                    decoration: const InputDecoration(
+                      labelText: 'Password',
+                      border: OutlineInputBorder(),
+                    ),
+                    onFieldSubmitted: (_) {
+                      if (!isLoading) {
+                        _login();
+                      }
+                    },
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter your password';
+                      }
+
+                      return null;
+                    },
                   ),
-                ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: isLoading ? null : _login,
-                    child: isLoading
-                        ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                      ),
-                    )
-                        : const Text('Login'),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: isLoading ? null : _login,
+                      child: isLoading
+                          ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                        ),
+                      )
+                          : const Text('Login'),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             );
           },
         ),

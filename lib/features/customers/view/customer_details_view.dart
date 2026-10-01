@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../cubit/customer_cubit.dart';
+import '../data/customer_model.dart';
 
 class CustomerDetailsView extends StatefulWidget {
   const CustomerDetailsView({
@@ -27,9 +28,9 @@ class _CustomerDetailsViewState
   void initState() {
     super.initState();
 
-    context
-        .read<CustomerCubit>()
-        .loadCustomerDetails(widget.customerId);
+    context.read<CustomerCubit>().loadCustomerDetails(
+      widget.customerId,
+    );
   }
 
   @override
@@ -57,11 +58,7 @@ class _CustomerDetailsViewState
     final phone = _phoneController.text.trim();
 
     if (phone.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Phone number cannot be empty'),
-        ),
-      );
+      _showMessage('Phone number cannot be empty');
       return;
     }
 
@@ -75,6 +72,46 @@ class _CustomerDetailsViewState
     );
   }
 
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+      ),
+    );
+  }
+
+  void _handleCustomerState(CustomerState state) {
+    switch (state) {
+      case CustomerDetailsLoaded():
+        if (!_isUpdatingPhone) {
+          return;
+        }
+
+        setState(() {
+          _isEditingPhone = false;
+          _isUpdatingPhone = false;
+        });
+
+        _showMessage('Phone updated successfully');
+
+      case CustomerError():
+        if (!_isUpdatingPhone) {
+          return;
+        }
+
+        setState(() {
+          _isUpdatingPhone = false;
+        });
+
+        _showMessage(state.message);
+
+      case CustomerInitial():
+      case CustomerLoading():
+      case CustomerLoaded():
+        break;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -83,213 +120,160 @@ class _CustomerDetailsViewState
       ),
       body: BlocConsumer<CustomerCubit, CustomerState>(
         listener: (context, state) {
-          if (state is CustomerDetailsLoaded) {
-            if (_isUpdatingPhone) {
-              setState(() {
-                _isEditingPhone = false;
-                _isUpdatingPhone = false;
-              });
-
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'Phone updated successfully',
-                  ),
-                ),
-              );
-            }
+          if (!context.mounted) {
+            return;
           }
 
-          if (state is CustomerError) {
-            if (_isUpdatingPhone) {
-              setState(() {
-                _isUpdatingPhone = false;
-              });
-
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(state.message),
-                ),
-              );
-            }
-          }
+          _handleCustomerState(state);
         },
         builder: (context, state) {
-          if (state is CustomerLoading) {
-            return const Center(
+          return switch (state) {
+            CustomerLoading() => const Center(
               child: CircularProgressIndicator(),
-            );
-          }
-
-          if (state is CustomerError) {
-            return Center(
+            ),
+            CustomerError(:final message) => Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
                 child: Text(
-                  state.message,
+                  message,
                   textAlign: TextAlign.center,
                 ),
               ),
-            );
-          }
-
-          if (state is CustomerDetailsLoaded) {
-            final customer = state.customer;
-
-            return ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                _InfoCard(
-                  title: 'Name',
-                  value: customer.name,
-                  icon: Icons.person_outline,
-                ),
-                const SizedBox(height: 12),
-
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment:
-                      CrossAxisAlignment.start,
-                      children: [
-                        const Row(
-                          children: [
-                            Icon(Icons.phone_outlined),
-                            SizedBox(width: 8),
-                            Text(
-                              'Phone',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-
-                        if (_isEditingPhone)
-                          TextField(
-                            controller: _phoneController,
-                            keyboardType: TextInputType.phone,
-                            enabled: !_isUpdatingPhone,
-                            decoration:
-                            const InputDecoration(
-                              border: OutlineInputBorder(),
-                              hintText: 'Enter phone number',
-                            ),
-                          )
-                        else
-                          Text(
-                            customer.phone ?? 'Not available',
-                            style: const TextStyle(
-                              fontSize: 16,
-                            ),
-                          ),
-
-                        const SizedBox(height: 12),
-
-                        Row(
-                          children: [
-                            if (!_isEditingPhone)
-                              OutlinedButton.icon(
-                                onPressed: () {
-                                  _startEditing(
-                                    customer.phone,
-                                  );
-                                },
-                                icon: const Icon(
-                                  Icons.edit,
-                                ),
-                                label: const Text('Edit'),
-                              ),
-
-                            if (_isEditingPhone) ...[
-                              ElevatedButton.icon(
-                                onPressed: _isUpdatingPhone
-                                    ? null
-                                    : _savePhone,
-                                icon: _isUpdatingPhone
-                                    ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child:
-                                  CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                                    : const Icon(
-                                  Icons.save,
-                                ),
-                                label: const Text('Save'),
-                              ),
-                              const SizedBox(width: 8),
-                              TextButton(
-                                onPressed:
-                                _isUpdatingPhone
-                                    ? null
-                                    : _cancelEditing,
-                                child:
-                                const Text('Cancel'),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 12),
-
-                _InfoCard(
-                  title: 'Email',
-                  value:
-                  customer.email ?? 'Not available',
-                  icon: Icons.email_outlined,
-                ),
-
-                const SizedBox(height: 12),
-
-                _InfoCard(
-                  title: 'Address',
-                  value: _buildAddress(customer),
-                  icon: Icons.location_on_outlined,
-                ),
-              ],
-            );
-          }
-
-          return const SizedBox.shrink();
+            ),
+            CustomerDetailsLoaded(:final customer) =>
+                _buildCustomerDetails(customer),
+            _ => const SizedBox.shrink(),
+          };
         },
       ),
     );
   }
 
-  String _buildAddress(dynamic customer) {
+  Widget _buildCustomerDetails(Customer customer) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        _InfoCard(
+          title: 'Name',
+          value: customer.name,
+          icon: Icons.person_outline,
+        ),
+        const SizedBox(height: 12),
+        _buildPhoneCard(customer),
+        const SizedBox(height: 12),
+        _InfoCard(
+          title: 'Email',
+          value: customer.email ?? 'Not available',
+          icon: Icons.email_outlined,
+        ),
+        const SizedBox(height: 12),
+        _InfoCard(
+          title: 'Address',
+          value: _buildAddress(customer),
+          icon: Icons.location_on_outlined,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPhoneCard(Customer customer) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.phone_outlined),
+                SizedBox(width: 8),
+                Text(
+                  'Phone',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (_isEditingPhone)
+              TextField(
+                controller: _phoneController,
+                keyboardType: TextInputType.phone,
+                textInputAction: TextInputAction.done,
+                enabled: !_isUpdatingPhone,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  hintText: 'Enter phone number',
+                ),
+                onSubmitted: (_) {
+                  if (!_isUpdatingPhone) {
+                    _savePhone();
+                  }
+                },
+              )
+            else
+              Text(
+                customer.phone ?? 'Not available',
+                style: const TextStyle(
+                  fontSize: 16,
+                ),
+              ),
+            const SizedBox(height: 12),
+            _buildPhoneActions(customer.phone),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPhoneActions(String? phone) {
+    if (!_isEditingPhone) {
+      return OutlinedButton.icon(
+        onPressed: () => _startEditing(phone),
+        icon: const Icon(Icons.edit),
+        label: const Text('Edit'),
+      );
+    }
+
+    return Row(
+      children: [
+        ElevatedButton.icon(
+          onPressed: _isUpdatingPhone ? null : _savePhone,
+          icon: _isUpdatingPhone
+              ? const SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+            ),
+          )
+              : const Icon(Icons.save),
+          label: const Text('Save'),
+        ),
+        const SizedBox(width: 8),
+        TextButton(
+          onPressed: _isUpdatingPhone ? null : _cancelEditing,
+          child: const Text('Cancel'),
+        ),
+      ],
+    );
+  }
+
+  String _buildAddress(Customer customer) {
     final parts = <String>[
-      if (customer.street != null &&
-          customer.street!.isNotEmpty)
+      if (customer.street?.isNotEmpty ?? false)
         customer.street!,
-      if (customer.street2 != null &&
-          customer.street2!.isNotEmpty)
+      if (customer.street2?.isNotEmpty ?? false)
         customer.street2!,
-      if (customer.city != null &&
-          customer.city!.isNotEmpty)
-        customer.city!,
-      if (customer.zip != null &&
-          customer.zip!.isNotEmpty)
-        customer.zip!,
-      if (customer.state != null &&
-          customer.state!.isNotEmpty)
-        customer.state!,
-      if (customer.country != null &&
-          customer.country!.isNotEmpty)
+      if (customer.city?.isNotEmpty ?? false) customer.city!,
+      if (customer.zip?.isNotEmpty ?? false) customer.zip!,
+      if (customer.state?.isNotEmpty ?? false) customer.state!,
+      if (customer.country?.isNotEmpty ?? false)
         customer.country!,
     ];
 
-    return parts.isEmpty
-        ? 'Not available'
-        : parts.join(', ');
+    return parts.isEmpty ? 'Not available' : parts.join(', ');
   }
 }
 

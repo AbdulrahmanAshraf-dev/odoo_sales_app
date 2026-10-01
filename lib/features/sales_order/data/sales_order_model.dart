@@ -25,11 +25,11 @@ class SalesOrder {
 
   factory SalesOrder.fromMap(Map<String, dynamic> map) {
     return SalesOrder(
-      id: map['id'] as int,
-      name: map['name'] as String? ?? '',
+      id: _toInt(map['id']),
+      name: _toString(map['name']),
       customerName: _many2OneName(map['partner_id']) ?? '',
-      orderDate: map['date_order'] as String? ?? '',
-      status: map['state'] as String? ?? '',
+      orderDate: _toString(map['date_order']),
+      status: _toString(map['state']),
       amountUntaxed: _toDouble(map['amount_untaxed']),
       amountTax: _toDouble(map['amount_tax']),
       amountTotal: _toDouble(map['amount_total']),
@@ -53,33 +53,6 @@ class SalesOrder {
       lineIds: lineIds,
     );
   }
-
-  static String? _many2OneName(dynamic value) {
-    if (value is List && value.length > 1) {
-      return value[1]?.toString();
-    }
-
-    return null;
-  }
-
-  static List<int> _toIntList(dynamic value) {
-    if (value is! List) {
-      return [];
-    }
-
-    return value
-        .whereType<num>()
-        .map((id) => id.toInt())
-        .toList();
-  }
-
-  static double? _toDouble(dynamic value) {
-    if (value is num) {
-      return value.toDouble();
-    }
-
-    return double.tryParse(value?.toString() ?? '');
-  }
 }
 
 class SalesOrderLine {
@@ -99,27 +72,72 @@ class SalesOrderLine {
 
   factory SalesOrderLine.fromMap(Map<String, dynamic> map) {
     return SalesOrderLine(
-      id: map['id'] as int,
+      id: _toInt(map['id']),
       productName: _many2OneName(map['product_id']) ?? '',
       quantity: _toDouble(map['product_uom_qty']) ?? 0,
       unitPrice: _toDouble(map['price_unit']) ?? 0,
       subtotal: _toDouble(map['price_subtotal']) ?? 0,
     );
   }
+}
 
-  static String? _many2OneName(dynamic value) {
-    if (value is List && value.length > 1) {
-      return value[1]?.toString();
-    }
+int _toInt(Object? value) {
+  if (value is int) {
+    return value;
+  }
 
+  if (value is num) {
+    return value.toInt();
+  }
+
+  throw FormatException(
+    'Invalid integer value: $value',
+  );
+}
+
+String _toString(Object? value) {
+  if (value == null || value == false) {
+    return '';
+  }
+
+  return value.toString().trim();
+}
+
+String? _many2OneName(Object? value) {
+  if (value is! List || value.length < 2) {
     return null;
   }
 
-  static double? _toDouble(dynamic value) {
-    if (value is num) {
-      return value.toDouble();
-    }
+  final name = value[1];
 
-    return double.tryParse(value?.toString() ?? '');
+  if (name == null || name == false) {
+    return null;
   }
+
+  final stringValue = name.toString().trim();
+
+  return stringValue.isEmpty ? null : stringValue;
+}
+
+List<int> _toIntList(Object? value) {
+  if (value is! List) {
+    return [];
+  }
+
+  return value
+      .whereType<num>()
+      .map((id) => id.toInt())
+      .toList();
+}
+
+double? _toDouble(Object? value) {
+  if (value is num) {
+    return value.toDouble();
+  }
+
+  if (value == null || value == false) {
+    return null;
+  }
+
+  return double.tryParse(value.toString().trim());
 }

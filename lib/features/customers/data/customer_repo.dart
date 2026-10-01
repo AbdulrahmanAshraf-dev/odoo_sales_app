@@ -8,17 +8,21 @@ import 'customer_model.dart';
 
 class CustomerRepository {
   CustomerRepository({
-    required this._odooClient,
-    required this._database,
-  }) {
+    required OdooClient odooClient,
+    required String database,
+    CustomerCache? cache,
+    Connectivity? connectivity,
+  })  : _odooClient = odooClient,
+        _database = database,
+        _cache = cache ?? CustomerCache(),
+        _connectivity = connectivity ?? Connectivity() {
     _startConnectivitySync();
   }
 
   final OdooClient _odooClient;
   final String _database;
-
-  final CustomerCache _cache = CustomerCache();
-  final Connectivity _connectivity = Connectivity();
+  final CustomerCache _cache;
+  final Connectivity _connectivity;
 
   StreamSubscription<List<ConnectivityResult>>?
   _connectivitySubscription;
@@ -32,38 +36,43 @@ class CustomerRepository {
   }
 
   void _startConnectivitySync() {
-    _connectivitySubscription = _connectivity.onConnectivityChanged.listen(
-          (results) {
-        final isOnline = results.any(
-              (result) => result != ConnectivityResult.none,
-        );
+    _connectivitySubscription =
+        _connectivity.onConnectivityChanged.listen(
+              (results) {
+            final isOnline = results.any(
+                  (result) => result != ConnectivityResult.none,
+            );
 
-        if (isOnline) {
-          syncPendingPhoneUpdates();
-        }
-      },
-    );
+            if (isOnline) {
+              unawaited(syncPendingPhoneUpdates());
+            }
+          },
+        );
   }
 
-  Future<List<Customer>> getCustomers({String? search}) async {
-    final isOnline = await _isOnline();
+  Future<List<Customer>> getCustomers({
+    String? search,
+  }) async {
+    final query = search?.trim();
 
-    if (!isOnline) {
-      return _getFromCache(search: search);
+    if (!await _isOnline()) {
+      return _getFromCache(search: query);
     }
 
     try {
-      final customers = await _getFromOdoo(search: search);
+      final customers = await _getFromOdoo(
+        search: query,
+      );
 
-      // Cache the complete customer list only.
-      if (search == null || search.trim().isEmpty) {
+      if (query == null || query.isEmpty) {
         await _cache.saveCustomers(customers);
       }
 
       return customers;
     } catch (_) {
-      // If Odoo is unavailable, fallback to cached data.
-      final cachedCustomers = await _getFromCache(search: search);
+      final cachedCustomers = await _getFromCache(
+        search: query,
+      );
 
       if (cachedCustomers.isNotEmpty) {
         return cachedCustomers;
@@ -76,15 +85,15 @@ class CustomerRepository {
   Future<List<Customer>> _getFromOdoo({
     String? search,
   }) async {
-    final domain = <dynamic>[
+    final domain = <Object?>[
       ['customer_rank', '>', 0],
     ];
 
-    if (search != null && search.trim().isNotEmpty) {
+    if (search != null && search.isNotEmpty) {
       domain.add([
         'name',
         'ilike',
-        search.trim(),
+        search,
       ]);
     }
 
@@ -122,11 +131,11 @@ class CustomerRepository {
   }) async {
     final customers = await _cache.getCachedCustomers();
 
-    if (search == null || search.trim().isEmpty) {
+    if (search == null || search.isEmpty) {
       return customers;
     }
 
-    final query = search.trim().toLowerCase();
+    final query = search.toLowerCase();
 
     return customers
         .where(
@@ -139,22 +148,8 @@ class CustomerRepository {
   Future<Customer> getCustomerDetails(
       int customerId,
       ) async {
-    final isOnline = await _isOnline();
-
-    if (!isOnline) {
-      final customers = await _cache.getCachedCustomers();
-
-      final cachedCustomer = customers.where(
-            (customer) => customer.id == customerId,
-      );
-
-      if (cachedCustomer.isNotEmpty) {
-        return cachedCustomer.first;
-      }
-
-      throw Exception(
-        'Customer not available offline',
-      );
+    if (!await _isOnline()) {
+      return _getCachedCustomer(customerId);
     }
 
     try {
@@ -188,49 +183,44 @@ class CustomerRepository {
       final customer = result.first;
 
       if (customer is! Map) {
-        throw Exception(
-          'Invalid customer response',
-        );
+        throw Exception('Invalid customer response');
       }
 
       final customerModel = Customer.fromMap(
         Map<String, dynamic>.from(customer),
       );
 
+      await _updateCachedCustomer(customerModel);
+
       return customerModel;
     } catch (_) {
-      final customers = await _cache.getCachedCustomers();
-
-      final cachedCustomer = customers.where(
-            (customer) => customer.id == customerId,
-      );
-
-      if (cachedCustomer.isNotEmpty) {
-        return cachedCustomer.first;
-      }
-
-      rethrow;
+      return _getCachedCustomer(customerId);
     }
+  }
+
+  Future<Customer> _getCachedCustomer(
+      int customerId,
+      ) async {
+    final customers = await _cache.getCachedCustomers();
+
+    for (final customer in customers) {
+      if (customer.id == customerId) {
+        return customer;
+      }
+    }
+
+    throw Exception('Customer not available offline');
   }
 
   Future<void> updateCustomerPhone({
     required int customerId,
     required String phone,
   }) async {
-    final isOnline = await _isOnline();
-
-    if (!isOnline) {
-      // Update local cache immediately.
-      await _updateCachePhone(
+    if (!await _isOnline()) {
+      await _saveOfflinePhoneUpdate(
         customerId: customerId,
         phone: phone,
       );
-
-      await _cache.savePendingPhoneUpdate(
-        customerId: customerId,
-        phone: phone,
-      );
-
       return;
     }
 
@@ -245,24 +235,30 @@ class CustomerRepository {
         phone: phone,
       );
 
-      // Remove any old pending update.
-      await _cache.clearPendingPhoneUpdate(
-        customerId,
-      );
+      await _cache.clearPendingPhoneUpdate(customerId);
     } catch (_) {
-      // If the request fails, keep the update locally.
-      await _updateCachePhone(
-        customerId: customerId,
-        phone: phone,
-      );
-
-      await _cache.savePendingPhoneUpdate(
+      await _saveOfflinePhoneUpdate(
         customerId: customerId,
         phone: phone,
       );
 
       rethrow;
     }
+  }
+
+  Future<void> _saveOfflinePhoneUpdate({
+    required int customerId,
+    required String phone,
+  }) async {
+    await _updateCachePhone(
+      customerId: customerId,
+      phone: phone,
+    );
+
+    await _cache.savePendingPhoneUpdate(
+      customerId: customerId,
+      phone: phone,
+    );
   }
 
   Future<void> _updatePhoneOnOdoo({
@@ -275,9 +271,7 @@ class CustomerRepository {
       method: 'write',
       args: [
         [customerId],
-        {
-          'phone': phone,
-        },
+        {'phone': phone},
       ],
     );
 
@@ -315,9 +309,33 @@ class CustomerRepository {
       },
     ).toList();
 
-    await _cache.saveCustomers(
-      updatedCustomers,
+    await _cache.saveCustomers(updatedCustomers);
+  }
+
+  Future<void> _updateCachedCustomer(
+      Customer updatedCustomer,
+      ) async {
+    final customers = await _cache.getCachedCustomers();
+
+    final exists = customers.any(
+          (customer) => customer.id == updatedCustomer.id,
     );
+
+    if (!exists) {
+      return;
+    }
+
+    final updatedCustomers = customers.map(
+          (customer) {
+        if (customer.id != updatedCustomer.id) {
+          return customer;
+        }
+
+        return updatedCustomer;
+      },
+    ).toList();
+
+    await _cache.saveCustomers(updatedCustomers);
   }
 
   Future<void> syncPendingPhoneUpdates() async {
@@ -336,15 +354,15 @@ class CustomerRepository {
         continue;
       }
 
+      final id = customerId.toInt();
+
       try {
         await _updatePhoneOnOdoo(
-          customerId: customerId.toInt(),
+          customerId: id,
           phone: phone,
         );
 
-        await _cache.clearPendingPhoneUpdate(
-          customerId.toInt(),
-        );
+        await _cache.clearPendingPhoneUpdate(id);
       } catch (_) {
       }
     }

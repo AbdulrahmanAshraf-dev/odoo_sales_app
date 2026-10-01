@@ -3,9 +3,39 @@ import 'sales_order_model.dart';
 
 class SalesOrderRepository {
   SalesOrderRepository({
-    required this._odooClient,
-    required this._database,
-  });
+    required OdooClient odooClient,
+    required String database,
+  })  : _odooClient = odooClient,
+        _database = database;
+
+  static const _salesOrderFields = [
+    'id',
+    'name',
+    'partner_id',
+    'date_order',
+    'state',
+  ];
+
+  static const _salesOrderDetailsFields = [
+    'id',
+    'name',
+    'partner_id',
+    'date_order',
+    'state',
+    'order_line',
+    'amount_untaxed',
+    'amount_tax',
+    'amount_total',
+  ];
+
+  static const _salesOrderLineFields = [
+    'id',
+    'order_id',
+    'product_id',
+    'product_uom_qty',
+    'price_unit',
+    'price_subtotal',
+  ];
 
   final OdooClient _odooClient;
   final String _database;
@@ -19,13 +49,7 @@ class SalesOrderRepository {
         [],
       ],
       kwargs: {
-        'fields': [
-          'id',
-          'name',
-          'partner_id',
-          'date_order',
-          'state',
-        ],
+        'fields': _salesOrderFields,
       },
     );
 
@@ -52,17 +76,7 @@ class SalesOrderRepository {
         [orderId],
       ],
       kwargs: {
-        'fields': [
-          'id',
-          'name',
-          'partner_id',
-          'date_order',
-          'state',
-          'order_line',
-          'amount_untaxed',
-          'amount_tax',
-          'amount_total',
-        ],
+        'fields': _salesOrderDetailsFields,
       },
     );
 
@@ -96,14 +110,7 @@ class SalesOrderRepository {
         lineIds,
       ],
       kwargs: {
-        'fields': [
-          'id',
-          'order_id',
-          'product_id',
-          'product_uom_qty',
-          'price_unit',
-          'price_subtotal',
-        ],
+        'fields': _salesOrderLineFields,
       },
     );
 
@@ -129,7 +136,7 @@ class SalesOrderRepository {
       args: [
         [orderId],
       ],
-      kwargs: {},
+      kwargs: const {},
     );
 
     if (result != true) {
