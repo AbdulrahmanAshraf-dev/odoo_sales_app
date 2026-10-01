@@ -1,3 +1,7 @@
+
+
+https://github.com/user-attachments/assets/d33570ae-9553-4807-8461-6714360f7ea3
+
 # Odoo Sales App
 
 A Flutter mobile application integrated with Odoo ERP for managing customers and sales orders.
